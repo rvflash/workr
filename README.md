@@ -16,24 +16,28 @@ It provides an interface similar to` sync / errgroup` to manage a group of subta
 ## Index 
 
 ```go
+func SuccessfulTaskIDs(tasks []*Task) []interface{}
 type Group
+
     func New(opts ...Setting) *Group
-    func WithContext(ctx context.Context) (*Group, context.Context)
+    func WithContext(parent context.Context, opts ...Setting) (*Group, context.Context)
+
     func (g *Group) Go(f func() error, opts ...Option)
     func (g *Group) Wait() error
     func (g *Group) WaitAndReturn() ([]*Task, error)
 
 type Option
-    func SetID(id interface{}) Option
+
     func AddErrToSkip(err error) Option
+    func SetID(id interface{}) Option
 
 type Setting
+
     func SetCancel(cancel context.CancelFunc) Setting
     func SetPoolSize(size int) Setting
     func SetQueueSize(size int) Setting
 
 type Task
-    func SuccessfulTaskIDs([]*Task) []interface{}
 ```
 
 
@@ -44,6 +48,7 @@ Simple use case.
 ```go
     g := new(workr.Group)
     g.Go(func() error {
+        // Do something ...
         return nil
     })
     err := g.Wait()
@@ -54,24 +59,17 @@ It also provides a method `WaitAndReturn` to get details on each task done and o
 ```go
     oops := errors.New("oops")
     
-    g, ctx := workr.WithContext(context.Background())
-	g.Go(
-		func() error {
-		    return oops
-	    },
-		workr.SetID(1),
-		workr.AddErrToSkip(oops), 
-	)
-    g.Go(
-        func() error {
-            return nil
-        },
-        workr.SetID(2),
-    )
-	res, err := g.WaitAndReturn()
-	if err != nil {
+    g, ctx := workr.WithContext(context.Background(), SetPoolSize(10))
+    g.Go(func() error {
+            return oops
+    }, workr.SetID(1), workr.AddErrToSkip(oops))
+    g.Go(func() error {
+        return nil
+    }, workr.SetID(2))
+    res, err := g.WaitAndReturn()
+    if err != nil {
         log.Fatalln(err)
     }
-	log.Println(workr.SuccessfulTaskIDs(res))
+    log.Println(workr.SuccessfulTaskIDs(res))
 }
 ```
