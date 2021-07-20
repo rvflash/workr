@@ -55,7 +55,7 @@ It also provides a method `WaitAndReturn` to get details on each task done and o
 ```go
     oops := errors.New("oops")
     
-    g, ctx := workr.WithContext(context.Background(), SetPoolSize(2))
+    g, ctx := workr.WithContext(context.Background(), workr.SetPoolSize(2))
     
     g.Go(func() error {
         return oops
