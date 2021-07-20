@@ -5,15 +5,18 @@
 package workr
 
 import (
-	"runtime"
 	"testing"
 
 	"github.com/matryer/is"
 )
 
+func TestNumCPU(t *testing.T) {
+	is.New(t).True(numCPU() > 0)
+}
+
 func TestNew(t *testing.T) {
 	var (
-		cpu = runtime.NumCPU()
+		cpu = numCPU()
 		def = &Group{poolSize: cpu, queueSize: cpu}
 		dt  = map[string]struct {
 			in  []Setting
@@ -36,10 +39,11 @@ func TestNew(t *testing.T) {
 		})
 	}
 }
+
 func TestNew2(t *testing.T) {
 	var (
 		are = is.New(t)
-		cpu = runtime.NumCPU()
+		cpu = numCPU()
 		g   Group
 	)
 	are.NoErr(g.Wait())

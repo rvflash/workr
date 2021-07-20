@@ -138,12 +138,22 @@ func (g *Group) init() {
 
 func setDefaultPoolSize() Setting {
 	return func(g *Group) {
-		g.poolSize = runtime.NumCPU()
+		g.poolSize = numCPU()
 	}
 }
 
 func setDefaultQueueSize() Setting {
 	return func(g *Group) {
-		g.queueSize = runtime.NumCPU()
+		g.queueSize = numCPU()
 	}
+}
+
+// numCPU returns the number of logical CPUs usable by the current process.
+// With a negative or zero value, 1 is returned by default.
+func numCPU() int {
+	n := runtime.NumCPU()
+	if n < 1 {
+		return 1
+	}
+	return n
 }
