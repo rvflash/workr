@@ -1,7 +1,7 @@
 # Workr, another Golang worker pool
 
 [![GoDoc](https://godoc.org/github.com/rvflash/workr?status.svg)](https://godoc.org/github.com/rvflash/workr)
-[![Build Status](https://github.com/rvflash/workr/workflows/build/badge.svg)](https://github.com/rvflash/workr/actions?workflow=test)
+[![Build Status](https://github.com/rvflash/workr/workflows/build/badge.svg)](https://github.com/rvflash/workr/actions?workflow=build)
 [![Code Coverage](https://codecov.io/gh/rvflash/workr/branch/main/graph/badge.svg)](https://codecov.io/gh/rvflash/workr)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rvflash/workr)](https://goreportcard.com/report/github.com/rvflash/workr)
 
