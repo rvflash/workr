@@ -64,8 +64,8 @@ func (g *Group) do(t *Task) {
 		return
 	}
 	g.rs = append(g.rs, t)
-	g.ch <- t
 	g.wg.Add(once)
+	g.ch <- t
 }
 
 // Wait blocks until all tasks function calls have returned,
@@ -138,22 +138,12 @@ func (g *Group) init() {
 
 func setDefaultPoolSize() Setting {
 	return func(g *Group) {
-		g.poolSize = numCPU()
+		g.poolSize = runtime.NumCPU()
 	}
 }
 
 func setDefaultQueueSize() Setting {
 	return func(g *Group) {
-		g.queueSize = numCPU()
+		g.queueSize = runtime.NumCPU()
 	}
-}
-
-// numCPU returns the number of logical CPUs usable by the current process.
-// With a negative or zero value, 1 is returned by default.
-func numCPU() int {
-	n := runtime.NumCPU()
-	if n < 1 {
-		return 1
-	}
-	return n
 }
