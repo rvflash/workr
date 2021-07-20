@@ -17,9 +17,9 @@ import (
 // The derived Context is canceled the first time a function passed to Go
 // returns a non-nil error or the first time Wait returns, whichever occurs
 // first.
-func WithContext(parent context.Context) (*Group, context.Context) {
+func WithContext(parent context.Context, opts ...Setting) (*Group, context.Context) {
 	ctx, cancel := context.WithCancel(parent)
-	return New(SetCancel(cancel)), ctx
+	return New(append([]Setting{SetCancel(cancel)}, opts...)...), ctx
 }
 
 // New returns a new instance of Group based on the given settings.
