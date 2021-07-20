@@ -1,6 +1,26 @@
-on: [push, pull_request]
-name: Test
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+name: run tests
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.14'
+      - name: Run coverage
+        run: go test -race -coverprofile=coverage.out -covermode=atomic
+      - name: Upload coverage to Codecov
+        run: bash <(curl -s https://codecov.io/bash)
   test:
     strategy:
       matrix:
@@ -8,16 +28,12 @@ jobs:
         platform: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: install go
+      - name: Install Go
+        if: success()
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
-      - name: checkout code
+      - name: Checkout code
         uses: actions/checkout@v2
-      - name: go test
-        run: |
-          go get -t -v ./...
-          go test -race -coverprofile=coverage.txt -covermode=atomic ./...
-          go tool cover -func=coverage.txt
-      - name: code coverage
-        run: bash <(curl -s https://codecov.io/bash)
+      - name: Run tests
+        run: go test -v -covermode=count
