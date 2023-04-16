@@ -17,7 +17,7 @@ func ID(id interface{}) Option {
 // Metadata associates these metadata to the task.
 func Metadata(list []interface{}) Option {
 	return func(t *Task) {
-		t.Metadata = append(t.Metadata, list)
+		t.Metadata = append(t.Metadata, list...)
 	}
 }
 

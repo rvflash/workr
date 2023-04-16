@@ -9,14 +9,6 @@ import (
 	"fmt"
 )
 
-// Error returns all the errors that happened.
-func Error(list Result, err error) error {
-	if err != nil {
-		return list.Error()
-	}
-	return nil
-}
-
 // FailedResult only returns the list of failed tasks.
 func FailedResult(list Result) Result {
 	return tasks(list, true)
@@ -60,6 +52,20 @@ func (r Result) Error() error {
 		err = errors.Join(err, t.err)
 	}
 	return err
+}
+
+// Metadata returns the aggregation of all Metadata.
+func (r Result) Metadata() []interface{} {
+	n := len(r)
+	if n == 0 {
+		return nil
+	}
+	// Best effort of allocations.
+	res := make([]interface{}, 0, len(r[0].Metadata))
+	for _, t := range r {
+		res = append(res, t.Metadata...)
+	}
+	return res
 }
 
 func newTask(f func() error, opts ...Option) *Task {

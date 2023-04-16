@@ -11,6 +11,12 @@ This number is by default fixed by the number of CPU.
 
 It provides an interface similar to `sync/errgroup` to manage a group of subtasks.
 
+## Install
+
+```bash
+$ go get -u github.com/rvflash/workr
+```
+
 ## Example
 
 Simple use case that returns the first error occurred.
