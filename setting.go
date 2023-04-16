@@ -33,3 +33,10 @@ func SetQueueSize(size int) Setting {
 		}
 	}
 }
+
+// ReturnAllErrors enables the error reporting to all.
+func ReturnAllErrors() Setting {
+	return func(g *Group) {
+		g.errAll = true
+	}
+}

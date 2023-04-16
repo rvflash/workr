@@ -1,3 +1,7 @@
+// Copyright (c) 2023 Hervé Gouchet. All rights reserved.
+// Use of this source code is governed by the MIT License
+// that can be found in the LICENSE file.
+
 package workr
 
 import (
@@ -5,23 +9,61 @@ import (
 	"fmt"
 )
 
-// SuccessfulTaskIDs returns the list of successful Task identifiers.
-func SuccessfulTaskIDs(tasks []*Task) []interface{} {
-	n := len(tasks)
-	if n == 0 {
-		return nil
+// Error returns all the errors that happened.
+func Error(list Result, err error) error {
+	if err != nil {
+		return list.Error()
 	}
-	res := make([]interface{}, 0, n)
-	for _, t := range tasks {
-		if t.Err == nil {
-			res = append(res, t.ID)
+	return nil
+}
+
+// FailedResult only returns the list of failed tasks.
+func FailedResult(list Result) Result {
+	return tasks(list, true)
+}
+
+// SuccessfulResult only returns the list of successful tasks.
+func SuccessfulResult(list Result) Result {
+	return tasks(list, false)
+}
+
+func tasks(list Result, failed bool) Result {
+	res := make(Result, 0, len(list))
+	for _, t := range list {
+		if t.failed() == failed {
+			res = append(res, t)
 		}
 	}
 	return res
 }
 
-func newTask(opts ...Option) *Task {
-	t := new(Task)
+// Result is a list of Task.
+type Result []*Task
+
+// IDList returns the list of task's identifiers.
+func (r Result) IDList() []interface{} {
+	n := len(r)
+	if n == 0 {
+		return nil
+	}
+	res := make([]interface{}, n)
+	for k, t := range r {
+		res[k] = t.ID
+	}
+	return res
+}
+
+// Error returns all errors occurred.
+func (r Result) Error() error {
+	var err error
+	for _, t := range r {
+		err = errors.Join(err, t.err)
+	}
+	return err
+}
+
+func newTask(f func() error, opts ...Option) *Task {
+	t := &Task{f: f}
 	for _, opt := range opts {
 		opt(t)
 	}
@@ -30,31 +72,54 @@ func newTask(opts ...Option) *Task {
 
 // Task represents a Task.
 type Task struct {
-	ID        interface{}
-	Err       error
-	ErrToSkip []error
-	Func      func() error
+	// ID uniquely identified a Task.
+	ID interface{}
+	// Metadata is the list of Task's metadata.
+	Metadata []interface{}
+
+	skipped []error
+	f       func() error
+	err     error
 }
 
-func (t *Task) do() {
-	defer func() {
-		r := recover()
-		switch {
-		case r != nil:
-			// Do not panic: throw an error.
-			t.Err = fmt.Errorf("%w: task ID(%v): %v", ErrPanic, t.ID, r)
-		case t.Err != nil:
-			t.Err = fmt.Errorf("worker pool: task ID(%v): %w", t.ID, t.Err)
+// Error returns the result of the task.
+func (t *Task) Error() error {
+	if t.err != nil {
+		if t.ID != nil {
+			return fmt.Errorf("workr task ID(%v): %w", t.ID, t.err)
 		}
-	}()
-	t.Err = t.Func()
+		return t.err
+	}
+	return nil
 }
 
-func (t Task) isErrSkipped() bool {
-	for _, target := range t.ErrToSkip {
-		if errors.Is(t.Err, target) {
+// ErrorSkipped returns true if the error must be ignored.
+func (t *Task) ErrorSkipped() bool {
+	if t.err == nil || len(t.skipped) == 0 {
+		return false
+	}
+	for _, target := range t.skipped {
+		if errors.Is(t.err, target) {
 			return true
 		}
 	}
 	return false
+}
+
+func (t *Task) do() (ok bool) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			// Do not panic: throw an error.
+			t.err = fmt.Errorf("%w: %v", ErrPanic, r)
+		}
+		ok = !t.failed()
+	}()
+	t.err = t.f()
+
+	return
+}
+
+func (t *Task) failed() bool {
+	return t == nil || (t.err != nil && !t.ErrorSkipped())
 }

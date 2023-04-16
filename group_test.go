@@ -45,10 +45,10 @@ func TestGroup_WaitAndReturn(t *testing.T) {
 			"No function": {
 				tasks: []func() error{nil},
 				opts: [][]workr.Option{
-					{workr.SetID(1)},
+					{workr.ID(1)},
 				},
 				err: workr.ErrPanic,
-				msg: "worker pool: panic: task ID(1): runtime error:",
+				msg: "workr task ID(1): workr: panic recovered: runtime error:",
 			},
 			"Return in error": {
 				tasks: []func() error{
@@ -63,13 +63,13 @@ func TestGroup_WaitAndReturn(t *testing.T) {
 					},
 				},
 				opts: [][]workr.Option{
-					{workr.SetID(1)},
-					{workr.SetID(2)},
-					{workr.SetID(3)},
+					{workr.ID(1)},
+					{workr.ID(2)},
+					{workr.ID(3)},
 				},
 				okN: 2,
 				err: oops,
-				msg: "worker pool: task ID(2):",
+				msg: "workr task ID(2):",
 			},
 			"Error skipped": {
 				tasks: []func() error{
@@ -84,11 +84,11 @@ func TestGroup_WaitAndReturn(t *testing.T) {
 					},
 				},
 				opts: [][]workr.Option{
-					{workr.SetID(1)},
-					{workr.SetID(2), workr.AddErrToSkip(oops)},
-					{workr.SetID(3)},
+					{workr.ID(1)},
+					{workr.ID(2), workr.SkipError(oops)},
+					{workr.ID(3)},
 				},
-				okN: 2,
+				okN: 3,
 			},
 			"OK": {
 				tasks: []func() error{
@@ -103,9 +103,9 @@ func TestGroup_WaitAndReturn(t *testing.T) {
 					},
 				},
 				opts: [][]workr.Option{
-					{workr.SetID(1)},
-					{workr.SetID(2)},
-					{workr.SetID(3)},
+					{workr.ID(1)},
+					{workr.ID(2)},
+					{workr.ID(3)},
 				},
 				okN: 3,
 			},
@@ -126,7 +126,7 @@ func TestGroup_WaitAndReturn(t *testing.T) {
 			)
 			are.True(errors.Is(err, tt.err))                               // mismatch error
 			are.True(err == nil || strings.HasPrefix(err.Error(), tt.msg)) // mismatch error message
-			are.Equal(tt.okN, len(workr.SuccessfulTaskIDs(res)))           // mismatch successful task number
+			are.Equal(tt.okN, len(workr.SuccessfulResult(res)))            // mismatch successful task number
 		})
 	}
 }

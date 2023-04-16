@@ -7,22 +7,23 @@ package workr
 // Option represents a Task option.
 type Option func(t *Task)
 
-func setFunc(f func() error) Option {
-	return func(t *Task) {
-		t.Func = f
-	}
-}
-
-// SetID defines the Task identifier.
-func SetID(id interface{}) Option {
+// ID defines the Task identifier.
+func ID(id interface{}) Option {
 	return func(t *Task) {
 		t.ID = id
 	}
 }
 
-// AddErrToSkip adds an error to skip.
-func AddErrToSkip(err error) Option {
+// Metadata associates these metadata to the task.
+func Metadata(list []interface{}) Option {
 	return func(t *Task) {
-		t.ErrToSkip = append(t.ErrToSkip, err)
+		t.Metadata = append(t.Metadata, list)
+	}
+}
+
+// SkipError adds an error to skip.
+func SkipError(err error) Option {
+	return func(t *Task) {
+		t.skipped = append(t.skipped, err)
 	}
 }

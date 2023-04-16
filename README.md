@@ -9,66 +9,62 @@
 for groups of tasks running in parallel with a limited number of goroutines.
 This number is by default fixed by the number of CPU.
 
-It provides an interface similar to` sync / errgroup` to manage a group of subtasks.
-
-
-## Index 
-
-```go
-type Group
-    func New(opts ...Setting) *Group
-    func WithContext(parent context.Context, opts ...Setting) (*Group, context.Context)
-    func (g *Group) Go(f func() error, opts ...Option)
-    func (g *Group) Wait() error
-    func (g *Group) WaitAndReturn() ([]*Task, error)
-
-type Option
-    func AddErrToSkip(err error) Option
-    func SetID(id interface{}) Option
-
-type Setting
-    func SetCancel(cancel context.CancelFunc) Setting
-    func SetPoolSize(size int) Setting
-    func SetQueueSize(size int) Setting
-
-type Task
-
-func SuccessfulTaskIDs(tasks []*Task) []interface{}
-```
-
+It provides an interface similar to `sync/errgroup` to manage a group of subtasks.
 
 ## Example
 
-Simple use case.
+Simple use case that returns the first error occurred.
 
 ```go
     g := new(workr.Group)
     g.Go(func() error {
-        // Do something ...
         return nil
     })
     err := g.Wait()
 ````
 
-It also provides a method `WaitAndReturn` to get details on each task done and one function to list those that were successful.
+A more advanced one that returns all errors that occurred, not only the first one.
+
+```go
+    var (
+        g   = workr.New(workr.ReturnAllErrors())
+        ctx = context.Background()
+    )
+    g.Go(func() error {
+        return doSomething(ctx)
+    })
+    g.Go(func() error {
+        return doSomethingElse(ctx)
+    })
+    err := g.Wait()
+````
+
+It also provides a method `WaitAndReturn` to get details on each task done and 
+functions to list those that were successful or `SuccessfulResult` not `FailedResult`.
+
+By creating the worker with a context, the first task on error will cancel it and so, 
+all tasks using it are also cancelled.
 
 ```go
     oops := errors.New("oops")
-    
+	
     g, ctx := workr.WithContext(context.Background(), workr.SetPoolSize(2))
-    
-    g.Go(func() error {
-        return oops
-    }, workr.SetID(1), workr.AddErrToSkip(oops))
-    
-    g.Go(func() error {
-     return nil
-    }, workr.SetID(2))
-    
+    g.Go(
+		func() error {
+            return oops
+        }, 
+		workr.ID(1), 
+		workr.SkipError(oops),
+	)
+    g.Go(
+		func() error {
+            return doSomething(ctx)
+        },
+		workr.SetID(2),
+	)
     res, err := g.WaitAndReturn()
     if err != nil {
-        log.Fatalln(err)
+        // No error expected
     }
-    log.Println(workr.SuccessfulTaskIDs(res))
-}
+    log.Println(workr.SuccessfulResult(res).IDList())
 ```
