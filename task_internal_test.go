@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/matryer/is"
 )
 
@@ -18,15 +20,27 @@ func TestNewTask(t *testing.T) {
 		oops  = errors.New("oops")
 		again = errors.New("again")
 		dt    = map[string]struct {
-			in  []Option
+			// inputs
+			opts []Option
+			// outputs
 			out *Task
 		}{
-			"Default":       {out: &Task{}},
-			"Identifier":    {in: []Option{SetID(math.MaxInt8)}, out: &Task{ID: math.MaxInt8}},
-			"Error to skip": {in: []Option{AddErrToSkip(oops)}, out: &Task{ErrToSkip: []error{oops}}},
+			"Default": {out: &Task{}},
+			"Identifier": {
+				opts: []Option{ID(math.MaxInt8)},
+				out:  &Task{ID: math.MaxInt8},
+			},
+			"Metadata": {
+				opts: []Option{Metadata([]interface{}{math.MaxInt8, math.MaxInt16})},
+				out:  &Task{Metadata: []interface{}{math.MaxInt8, math.MaxInt16}},
+			},
+			"Error to skip": {
+				opts: []Option{SkipError(oops)},
+				out:  &Task{skipped: []error{oops}},
+			},
 			"Errors to skip": {
-				in:  []Option{AddErrToSkip(oops), AddErrToSkip(again)},
-				out: &Task{ErrToSkip: []error{oops, again}},
+				opts: []Option{SkipError(oops), SkipError(again)},
+				out:  &Task{skipped: []error{oops, again}},
 			},
 		}
 	)
@@ -35,8 +49,8 @@ func TestNewTask(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			out := newTask(tt.in...)
-			is.New(t).Equal(out, tt.out)
+			out := newTask(nil, tt.opts...)
+			is.New(t).Equal("", cmp.Diff(tt.out, out, cmp.AllowUnexported(Task{}), cmpopts.EquateErrors()))
 		})
 	}
 }
@@ -45,26 +59,29 @@ func TestTask_Do(t *testing.T) {
 	var (
 		oops = errors.New("oops")
 		dt   = map[string]struct {
-			in  *Task
+			// inputs
+			in *Task
+			// outputs
+			ok  bool
 			err error
 			msg string
 		}{
 			"Default": {
 				in:  new(Task),
 				err: ErrPanic,
-				msg: "worker pool: panic: task ID(<nil>): runtime error",
+				msg: "runtime error",
 			},
 			"Error": {
-				in: &Task{Func: func() error {
+				in: &Task{f: func() error {
 					return oops
 				}},
 				err: oops,
-				msg: "worker pool: task ID(<nil>): oops",
 			},
 			"OK": {
-				in: &Task{Func: func() error {
+				in: &Task{f: func() error {
 					return nil
 				}},
+				ok: true,
 			},
 		}
 	)
@@ -73,10 +90,13 @@ func TestTask_Do(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			tt.in.do()
-			are := is.New(t)
-			are.True(errors.Is(tt.in.Err, tt.err))                                     // mismatch error
-			are.True(tt.in.Err == nil || strings.HasPrefix(tt.in.Err.Error(), tt.msg)) // mismatch error message
+			var (
+				ok  = tt.in.do()
+				are = is.New(t)
+			)
+			are.Equal(tt.ok, ok)                                                      // mismatch result
+			are.True(errors.Is(tt.in.err, tt.err))                                    // mismatch error
+			are.True(tt.in.err == nil || strings.Contains(tt.in.err.Error(), tt.msg)) // mismatch error message
 		})
 	}
 }
@@ -88,10 +108,10 @@ func TestTask_Do2(t *testing.T) {
 		}
 	}()
 	var job *Task
-	job.do()
+	is.New(t).True(!job.do())
 }
 
-func TestTask_IsErrSkipped(t *testing.T) {
+func TestTask_ErrorSkipped(t *testing.T) {
 	var (
 		oops = errors.New("oops")
 		dt   = map[string]struct {
@@ -99,8 +119,8 @@ func TestTask_IsErrSkipped(t *testing.T) {
 			out bool
 		}{
 			"Default": {in: new(Task)},
-			"Blank":   {in: &Task{Err: oops, ErrToSkip: []error{}}},
-			"OK":      {in: &Task{Err: oops, ErrToSkip: []error{oops}}, out: true},
+			"Blank":   {in: &Task{err: oops, skipped: []error{}}},
+			"OK":      {in: &Task{err: oops, skipped: []error{oops}}, out: true},
 		}
 	)
 	t.Parallel()
@@ -108,8 +128,96 @@ func TestTask_IsErrSkipped(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			out := tt.in.isErrSkipped()
+			out := tt.in.ErrorSkipped()
 			is.New(t).Equal(tt.out, out)
+		})
+	}
+}
+
+func TestSuccessfulResult(t *testing.T) {
+	var (
+		oops = errors.New("oops")
+		dt   = map[string]struct {
+			in   Result
+			ids  []interface{}
+			data []interface{}
+		}{
+			"Default": {},
+			"Blank":   {in: Result{}},
+			"Mixed": {
+				in: Result{
+					{ID: 1},
+					{ID: 2, Metadata: []interface{}{1, 2}, err: oops},
+					{ID: 3, Metadata: []interface{}{3}},
+				},
+				ids:  []interface{}{1, 3},
+				data: []interface{}{3},
+			},
+			"OK": {
+				in: Result{
+					{ID: 1, Metadata: []interface{}{1, 2}},
+					{ID: 2},
+					{ID: 3, Metadata: []interface{}{3, 4}},
+				},
+				ids:  []interface{}{1, 2, 3},
+				data: []interface{}{1, 2, 3, 4},
+			},
+		}
+	)
+	t.Parallel()
+	for name, tt := range dt {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var (
+				are = is.New(t)
+				out = SuccessfulResult(tt.in)
+			)
+			are.Equal(tt.ids, out.IDList())    // mismatch identifiers
+			are.Equal(tt.data, out.Metadata()) // mismatch metadata
+		})
+	}
+}
+
+func TestFailedResult(t *testing.T) {
+	var (
+		oops = errors.New("oops")
+		dt   = map[string]struct {
+			in   Result
+			ids  []interface{}
+			data []interface{}
+		}{
+			"Default": {},
+			"Blank":   {in: Result{}},
+			"Mixed": {
+				in: Result{
+					{ID: 1, Metadata: []interface{}{1, 2}},
+					{ID: 2, Metadata: []interface{}{3, 4}, err: oops},
+					{ID: 3, Metadata: []interface{}{5, 6}},
+				},
+				ids:  []interface{}{2},
+				data: []interface{}{3, 4},
+			},
+			"OK": {
+				in: Result{
+					{ID: 1, Metadata: []interface{}{1, 2}},
+					{ID: 2, Metadata: []interface{}{3, 4}},
+					{ID: 3, Metadata: []interface{}{5, 6}},
+				},
+			},
+		}
+	)
+	t.Parallel()
+	for name, tt := range dt {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var (
+				are = is.New(t)
+				out = FailedResult(tt.in)
+			)
+			are.Equal(tt.ids, out.IDList())    // mismatch identifiers
+			are.Equal(tt.data, out.Metadata()) // mismatch metadata
 		})
 	}
 }

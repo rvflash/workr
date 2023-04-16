@@ -12,5 +12,5 @@ import (
 )
 
 func TestErrWorkr_Error(t *testing.T) {
-	is.New(t).Equal("worker pool: panic", workr.ErrPanic.Error())
+	is.New(t).Equal("workr: panic recovered", workr.ErrPanic.Error())
 }
