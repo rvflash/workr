@@ -13,6 +13,8 @@ It provides an interface similar to `sync/errgroup` to manage a group of subtask
 
 ## Install
 
+go 1.20 is the minimum required version due to the usage of `errors.Join`.
+
 ```bash
 $ go get -u github.com/rvflash/workr
 ```
